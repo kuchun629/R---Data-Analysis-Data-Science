@@ -1,0 +1,243 @@
+---
+title: "1. Data Cleaning"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Data Cleaning: dataset 1
+```{r}
+# Load tidyverse package
+library(tidyverse)
+
+# Import our data and save it as datafile
+datafile <- read_csv("survey.csv")
+```
+
+### head()
+```{r}
+# View the first five rows with head()
+# head(filename, n) shows the first n lines of the data file
+head(datafile, 6)
+```
+
+### str()
+#### the structure of the variables
+```{r}
+# Check the structure of the variables in the dataset by using str() function
+str(datafile)
+```
+
+### as.factor()
+#### categorical variables
+```{r}
+# When we check the structure of the data, we see that some of the variables are stored as characters instead of categorical variables. We will set the correct measurement levels for those variables by using as.factor() function.
+datafile$Gender <- as.factor(datafile$Gender)
+```
+
+### lappy()
+```{r}
+# In order to change the data types of multiple columns, we will use lapply() function together with as.factor(). lapply() function is very useful for performing operations on list objects such as columns of a dataframe.
+
+# lapply(vector, function)
+
+# Set the correct measurement levels for Gender, Handedness, Exercise and Smoke using lapply() and as.factor() functions
+
+# First generate a vector to keep the column names
+columns <- c("Gender", "Handedness", "Exercise", "Smoke")
+
+# Set the correct measurement levels or data types
+datafile[columns] <- lapply(datafile[columns], as.factor)
+```
+
+### levels()
+```{r}
+# Check levels of the Gender column
+levels(datafile$Gender)
+```
+
+### which()
+#### find indices
+```{r}
+# Replace female with Female
+# (1) Find the indices of rows with "female" value
+( index_female <- which(datafile$Gender == "female") )
+```
+
+```{r}
+# (2) Replace those entries with "Female"
+datafile$Gender[index_female] = "Female"
+```
+
+```{r}
+# Replace male with Male
+# (1) Find the indices of rows with "male" value
+( index_male <- which(datafile$Gender == "male") )
+```
+
+```{r}
+# (2) Replace those entries with "Male"
+datafile$Gender[index_male] = "Male"
+```
+
+```{r}
+# Check levels of the Gender column again
+levels(datafile$Gender)
+```
+
+```{r}
+# Although we corrected the entry errors in the Gender column, the levels did not change. Hence, we should update the factor levels by using factor() function.
+
+# Update the levels
+datafile$Gender <- factor(datafile$Gender)
+```
+
+### missing value
+### summary()
+#### statistical information about the data -> check missing values
+```{r}
+# Check the summary of the data file
+summary(datafile)
+```
+
+### mean()
+```{r}
+# Find the average pulse 
+mean(datafile$Pulse)
+```
+
+### na.omit()
+#### remove records with missing values and assign it to `datafile_new`.
+```{r}
+# Remove records with missing values and assign it to datafile_new
+datafile_new <- na.omit(datafile)
+```
+
+```{r}
+# Calculate the number of records removed from the data
+nrow(datafile) - nrow(datafile_new)
+```
+
+```{r}
+# Find the average of Pulse by excluding the missing values
+avg_pulse <- mean(datafile$Pulse, na.rm = T) 
+            # na.rm: whether or not to remove NA values from the calculation
+print(avg_pulse)
+```
+
+```{r}
+# Find the average of Height by excluding the missing values
+avg_height <- mean(datafile$Height, na.rm = T)
+
+print(avg_height)
+```
+
+### replace_na()
+```{r}
+# Replace records with missing values
+datafile_replace <- replace_na(datafile, list(Pulse = avg_pulse, Height = avg_height))
+
+#  Remove records with missing values and assign the redacted dataset to datafile_removed
+datafile_removed <- na.omit(datafile_replace)
+
+# Calculate the number of records removed from the data
+nrow(datafile) - nrow(datafile_removed)
+```
+
+## Data Cleaning: dataset 2
+### new dataset
+#### `Credit.csv`
+```{r}
+# Load tidyverse package
+library(tidyverse)
+
+# Import the data and save it as crdata
+crdata <- read_csv("Credit.csv")
+```
+
+```{r}
+# View the first four rows with head()
+head(crdata, 4)  
+
+# Check the structure of the variables in the dataset by using str() function
+str(crdata)
+
+# Check the summary of the dataset
+summary(crdata)
+
+# Update the data types if necessary
+```
+
+### boxplot()
+#### check outliner
+```{r}
+# outliner in the Age column of crdata
+boxplot(crdata$Age)
+```
+
+### which()
+```{r}
+# Find the indices of records with age >= 100 and assign these indices to outliers
+outliers <- which(crdata$Age>=100)  
+
+# Print data records with outliers 
+print(crdata[outliers,])
+```
+
+### remove rows/columns
+```{r}
+# dataframe[-rowindex,]
+```
+
+```{r}
+# Remove data records with age >= 100 
+crdata <- crdata[-outliers,]
+
+# check the boxplot for Age column again
+boxplot(crdata$Age)
+```
+
+```{r}
+# Find the average income by excluding the missing values
+income_avg <- mean(crdata$Income, na.rm=TRUE)
+
+#print average income
+print(income_avg)
+```
+
+```{r}
+# Replace missing values in Income column with average income
+crdata_replace <- replace_na(crdata, list(Income = income_avg))
+```
+
+```{r}
+# Remove records with missing values and assign it to crdata_removed
+crdata_removed <- na.omit(crdata_replace)
+
+# Check the summary of the dataset again
+summary(crdata_removed)
+```
+
+```{r}
+# Calculate the number of removed records
+nrow(crdata) - nrow(crdata_removed)
+```
+
+#### Illustrate the relation between two features; “Income” and “Rating”.
+### ggplot
+```{r}
+# ggplot(data, aes(x, y)) + <geom_function>()
+```
+
+```{r}
+# Use geom_point(color = "steelblue") to add a scatter plot with blue colour
+ggplot(crdata_removed, aes(x = Income, y = Rating)) + geom_point(color= "steelblue")
+```
