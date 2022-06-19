@@ -1,0 +1,166 @@
+---
+title: "2. Data Preparation"
+date: '2022-06-19'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+---
+
+```{r}
+# install.packages("caTools")
+# install.packages("ROSE")
+
+# Load caTools package for data partitioning
+library(caTools) 
+
+# Load ROSE package for data balancing
+library(ROSE) 
+
+# Import our data and save it to variable creditdf
+creditdf <- read.csv("Credit 2.csv")
+```
+
+```{r}
+# Check the structure of the variables in the dataframe by using str() function
+str(creditdf)
+```
+
+### label encoding
+#### applying data encoding for machine learning models that may not work well with categorical variables. Therefore, after this step, the variable should be saved as a numeric variable with as.numeric() function.
+### revalue()
+#### revalue() function from plyr package
+```{r}
+# revalue(column name, c("level name" = "label"))
+```
+
+#### `credit_history`: critical < poor < good < very good < perfect with labels from 1 to 5
+#### label encoding `credit_history` column
+```{r}
+# install.packages("plyr")
+
+# Load plyr package for data encoding
+library(plyr)
+
+# Apply label encoding to credit_history
+unique(creditdf$credit_history)
+creditdf$credit_history <- revalue(creditdf$credit_history, c("critical" = "1", "poor" = "2", "good" = "3", "very good" = "4", "perfect" = "5"))
+
+# Save credit_history as a numerical variable
+creditdf$credit_history <- as.numeric(creditdf$credit_history)
+```
+
+#### `phone`: yes = 1 and no = 0
+#### label encoding `phone` column
+```{r}
+# Apply label encoding to phone
+creditdf$phone <- revalue(creditdf$phone, c("yes" = "1", "no" = "0"))
+
+# Save credit_history as a numerical variable
+creditdf$phone <- as.numeric(creditdf$phone)
+
+# Check the summary of the updated dataset
+summary(creditdf)
+```
+
+### one hot encoding
+### one_hot()
+#### one_hot() function from mltools package
+```{r}
+# one_hot(as.data.table(dataset), cols = column name)
+```
+#### `the 1st argument`: one_hot() function works with data tables to process the datasets easily. Therefore, the dataset should be first saved as data.table by using as.data.table(dataset) function.
+#### `the 2nd argument`: stores the nominal variables (column names) that should be encoded.
+
+#### applying one hot encoding to `purpose` variable
+```{r}
+# install.packages("mltools")
+# install.packages("data.table")
+
+# Load mltools package
+library(mltools)
+
+# Load data.table package
+library(data.table)
+
+# Apply one hot encoding
+creditdf$purpose <- as.factor(creditdf$purpose)
+creditdf <- one_hot(as.data.table(creditdf), cols = "purpose")
+
+# Check the summary of the updated dataset
+summary(creditdf)
+```
+
+### partition
+#### partition the dataset into training and test sets
+### sample.split()
+### subset()
+#### split the dataset into the training set (70%) and test set (30%) 
+```{r}
+# Set a seed of 10 by using set.seed() function
+set.seed(10)
+
+# Generate split vector to partition the data into training and test sets with training ratio of 0.70
+split <- sample.split(creditdf$high_risk, SplitRatio = 0.7)   
+
+# Generate the training and test sets by subsetting the data records from actual dataset
+training <- subset(creditdf, split == TRUE) 
+
+testing <- subset(creditdf, split == FALSE) 
+```
+
+### data balancing
+### ovun.sample()
+#### ovun.sample() function with method = "over", "both" or "under"
+#### balance training dataset: balance the data with `oversampling` technique so that the minority class accounts for approximately 40% of the training dataset
+```{r}
+# Apply oversampling technique
+oversampled <- ovun.sample(high_risk ~ ., data = training, method = "over", p=0.4, seed=1)$data
+```
+
+#### try both undersampling and oversampling method by using ovun.sample() function with method = "both". Set the proportion of minority class as 0.4.
+```{r}
+# Apply both over and under sampling technique
+bothsampled <- ovun.sample(high_risk ~ ., data = training, method = "both", p=0.4, seed=1)$data
+```
+
+### compare different training sets
+#### Compare the distribution of high risk customers in the initial training set with the oversampled training set and both over and under sampled training set. Use table() and prob.table() functions.
+#### the `initial` training set
+```{r}
+# Check the distribution of high risk customers in the initial training set
+table(training$high_risk)
+
+# Check the proportion of high risk customers in the initial training set
+prop.table(table(training$high_risk))
+```
+
+```{r}
+# Use barplot() function to plot the distribution of high risk customers
+barplot(table(training$high_risk), xlab= "Classes", ylab="Frequency")
+```
+#### the `oversampled` training set
+```{r}
+# Check the distribution of high risk customers in the oversampled training set
+table(oversampled$high_risk)
+
+# Check the proportion of high risk customers in the oversampled training set
+prop.table(table(oversampled$high_risk))
+
+# Plot the distribution by using barplot() function
+barplot(table(oversampled$high_risk), xlab= "Classes", ylab="Frequency")
+```
+#### the `bothsampled` training set
+```{r}
+# Check the distribution of high risk customers in "bothsampled" training set
+table(bothsampled$high_risk)
+
+# Check the proportion of high risk customers in bothsampled training set
+prop.table(table(bothsampled$high_risk))
+
+# Plot the distribution by using barplot() function
+barplot(table(bothsampled$high_risk), xlab= "Classes", ylab="Frequency")
+```
