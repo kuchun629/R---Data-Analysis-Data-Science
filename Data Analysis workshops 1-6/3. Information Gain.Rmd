@@ -1,0 +1,186 @@
+---
+title: "3. Information Gain"
+date: '2022-06-19'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+---
+
+
+```{r}
+# install.packages("FSelector")
+
+# Load FSelector package for Feature Selection
+library(FSelector)  
+
+# Load "caTools" package for data partitioning
+library(caTools)
+
+# Load tidyverse package 
+library(tidyverse)
+
+# Import data set and save it as empdata
+empdata <- read.csv("EmployeeData.csv", stringsAsFactors = TRUE) #convert string variables to factor variables
+```
+
+### check structure
+```{r}
+# Check the summary of the dataset
+summary(empdata)
+
+# Check the structure of the dataset
+str(empdata)
+```
+
+### redundant variables
+```{r}
+# Remove redundant variables
+empdata[c("EmployeeCount", "EmployeeNumber", "Over18", "StandardHours")] <- NULL
+```
+
+### split data
+```{r}
+# Set a seed
+set.seed(10)
+
+# Generate a vector named partition for data partitioning 
+partition = sample.split(empdata$Attrition, SplitRatio = 0.8) 
+
+# Create training set: training
+training = subset(empdata, partition == TRUE) 
+
+# Create test set: test
+test = subset(empdata, partition == FALSE) 
+```
+
+### feature selection
+### information.gain()
+```{r}
+# information.gain(target~.,dataset)
+```
+
+```{r}
+# Use function information.gain to compute information gain values of the attributes
+attr_weights <- information.gain(Attrition~. , empdata)
+
+# Print weights
+print(attr_weights)
+```
+### sorting the result
+### order()
+#### Use order() function to sort the attributes with respect to their information gain values. Then, use barplot() function to illustrate the result.
+```{r, fig.align='center'}
+# Sort the weights. Use order() function
+sorted_weights <- attr_weights[order(attr_weights$attr_importance), ,drop = FALSE]
+
+# Plot the sorted weights
+barplot(unlist(sorted_weights), 
+        names.arg = rownames(sorted_weights), las = "2", cex.names=0.7,
+        ylim = c(0,0.05), space = 0.5)
+```
+
+```{r}
+# Filter features where the information gain is not zero
+library(dplyr)
+attr_weights %>% filter(attr_importance > 0)
+```
+
+### cutoff.k()
+####  filter the most informative k attributes
+#### cutoff.k() orders the attributes according to their information gain and returns the first k.
+#### cutoff.k.percent(weights, k) selects k* 100% of attributes.
+#### cutoff.biggest.diff(weights) selects a subset of attributes which are significantly better than others.
+```{r}
+# cutoff.k(weights,k) 
+```
+
+```{r}
+# Use cutoff.k() to find the most informative 19 attributes
+filtered_attributes <- cutoff.k(attr_weights, 19)
+
+# Print filtered attributes
+print(filtered_attributes)
+
+# Use cutoff.biggest.diff() to a subset of attributes which are significantly better than other
+cutoff.biggest.diff(attr_weights)
+```
+
+### ggplot
+#### plot “Attrition” vs “OverTime”
+```{r, fig.align='center'}
+library(tidyverse)
+ggplot(empdata, 
+      aes(x = Attrition, group = OverTime)) + 
+      geom_bar(aes(y = ..prop.., fill = factor(..x..)), 
+                   stat="count", 
+                   alpha = 0.7) +
+      geom_text(aes(label = scales::percent(..prop..), y = ..prop.. ), 
+                   stat= "count", 
+                   vjust = -.1) +
+      labs(y = "Percentage") +
+      facet_grid(~OverTime) +
+      scale_fill_manual("Attrition" ,values = c("steelblue","orange"), labels=c("No", "Yes")) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      ggtitle("Over time")
+```
+
+### rename categories
+### revalue()
+```{r}
+# Revalue categories for the plot. Load 'plyr' package
+library(plyr)
+
+# Rename categories for illustration
+training$JobRole <- revalue(training$JobRole, 
+                            c("Healthcare Representative" = "HealthRep", 
+                              "Human Resources" = "HR",
+                              "Laboratory Technician" = "LabTech",
+                              "Manager" = "Mgr",
+                              "Manufacturing Director" = "ManufDir",
+                              "Research Director" = "ResDir",
+                              "Research Scientist" = "ResSci",
+                              "Sales Executive" = "SaleExec",
+                              "Sales Representative" = "SaleRep"))
+
+barplotdata = table(training$Attrition, training$JobRole)
+
+# Use barplot function to plot Attrition vs JobRole
+barplot(barplotdata, main = "Attrition vs Job Role",
+        xlab="JobRole",col=c("steelblue","orange"),
+        legend=rownames(barplotdata), cex.names = 0.70, beside = TRUE)
+```
+ 
+### plot Attrition vs JobLevel
+```{r}
+# Plot Attrition vs JobLevel
+barplotdata2 = table(training$Attrition, training$JobLevel)
+
+
+barplot(barplotdata2,
+        main="Attrition vs JobLevel",
+        xlab="Job Level", col=c("#386cb0","#fdb462"),
+        legend=rownames(barplotdata), cex.names = 0.75, beside = TRUE)
+```
+### plot Attrition vs Monthly Income
+```{r}
+# Plot Attrition vs Monthly Income
+ggplot(training, aes(x = MonthlyIncome, fill = Attrition)) + 
+  geom_density(alpha = 0.7) + 
+  scale_fill_manual(values = c("#386cb0","#fdb462"))
+```
+### subset training set
+```{r}
+# Select a subset of the dataset by using filtered_attributes 
+datamodelling <- training[filtered_attributes]
+```
+
+#### Since filtered_attributes does not include `the target variable`, `Attrition` column is not present in our constructed data file. Adding it to the data file is needed for model building .
+```{r}
+datamodelling["target"] <- training["Attrition"]
+# or
+datamodelling$target <- training$Attrition
+```
