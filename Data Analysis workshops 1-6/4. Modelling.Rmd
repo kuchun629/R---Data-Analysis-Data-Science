@@ -1,0 +1,199 @@
+---
+title: "4. Modelling"
+date: '2022-06-20'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+---
+
+#### Aim: predict whether an e-mail is spam or not
+```{r}
+# Load caTools package for data partitioning
+library(caTools)
+
+# Import spambase.csv and assing it to mydata
+mydata <- read.csv('spambase.csv')
+
+# Display the structure of the data file
+str(mydata)
+```
+
+```{r}
+# Change the data type of target variable if necessary
+mydata$class <- as.factor(mydata$class)
+
+levels(mydata$class)
+```
+
+### split data
+#### 70% of the data should be allocated to training set and the remaining should be allocated to the test set.
+#### To use sample.split() function, load caTools package.
+```{r}
+#Set a seed of 123 
+set.seed(123)
+
+#Generate a vector split
+split <- sample.split(mydata, SplitRatio = 0.7) 
+
+# Create training set: training
+training <- subset(mydata, split == TRUE) 
+
+# Create test set: test
+test <- subset(mydata, split == FALSE) 
+```
+
+### predictive models
+### Decision Tree
+#### In R, tree library is used to construct `classification` and `regression` trees.
+```{r}
+# install.packages("tree")
+# install.packages("maptree")
+
+# Load tree library
+library(tree)
+
+# Load maptree library for plotting
+library(maptree)
+```
+
+#### Use tree() function to fit a classification tree in order to predict class of an e-mail. 
+```{r}
+# tree(target~.,data)
+```
+
+#### Use summary() function to list the features that are used in the tree, the number of terminal nodes, and the (training) error rate.
+```{r}
+# Build the decision tree by using tree() function
+tree_spam <- tree(class~. , training)
+
+# Display the summary of your model and print the model
+summary(tree_spam)
+
+# Plot the model
+draw.tree(tree_spam)
+```
+
+#### Note that the decision tree parameters can be controled using the tree.control argument.
+```{r}
+# tree.control(nobs, mincut, minsize, mindev)
+
+# nobs: The number of observations in the training set.
+# mincut: The minimum number of observations to have in a child node (the default value is 5).
+# minsize: The smallest number of observations in a node (the default value is 10).
+# mindev: In order to split a node, the deviance must be at least this times that of the root node.
+```
+
+### predict()
+#### Use predict() function to predict the spam class in the test data. 
+#### predict() function for tree() model 
+```{r}
+# predict(modelname, testdata, type = "class")
+```
+
+### predict test set
+### accuracy rate
+```{r}
+# Predict the class of emails in test set
+tree_predict = predict(tree_spam, test, type = "class")
+
+# Find the percentage of correct predictions
+accuracy_tree <- length(which(tree_predict == test$class))/nrow(test)
+accuracy_tree
+```
+
+### SVM (Support Vector Machines)
+#### Build an SVM model using training_set. Initially, set the kernel = "radial" and also try kernel = "linear".
+
+#### Predict e-mail classification (spam or not) for the test data.
+```{r}
+# Load package e1071
+library(e1071)
+```
+
+### SVM model 1
+```{r}
+# kernel="radial"
+# Build a SVM model by using svm() function
+svm_spam_1  <- svm(class ~. , data = training, kernel = "radial", scale = TRUE)
+
+# Predicting the Test set results 
+svm_predict_1 = predict(svm_spam_1, test)
+
+# Find the percentage of correct predictions
+ 
+accuracy_svm_1 <- length(which(svm_predict_1 == test$class))/nrow(test)
+accuracy_svm_1
+```
+
+### SVM model 2
+```{r}
+# kernel="linear"
+# Build a SVM model by using svm() function
+svm_spam_2  <- svm(class ~. , data = training, kernel = "linear", scale = TRUE)
+
+# Predicting the Test set results 
+svm_predict_2 = predict(svm_spam_2 , test)
+
+# Find the percentage of correct predictions
+ 
+accuracy_svm_2 <- length(which(svm_predict_2 == test$class))/nrow(test)
+accuracy_svm_2
+```
+
+### Logistic Regression
+#### It is a classification technique which models the `probability` that a target variable belongs to a particular class.
+### glm()
+```{r}
+# glm(formula, data, family = ...)
+
+# Formula shows which features are used in modelling to predict target variable.
+# Data is the dataset that will be used for model building.
+# Family shows which type of model we want to develop. glm() function can be used to build generalised linear models (GLM). In order to use logistic function, we should set family = "binomial".
+```
+
+```{r}
+# Build a logistic regression model assign it to LR_spam
+LR_spam <- glm(class ~. , data = training, family = "binomial")
+```
+
+#### Predict the class of the test data and store the result.
+```{r}
+# predict(logistic regression model, test data, type="response")
+```
+
+```{r}
+# Predict the class probabilities of the test data
+LR_prob <- predict(LR_spam, test, type="response")
+```
+
+#### LR_prob will return the class scores (or probabilities). In order to predict the class of a test data, a cutoff value 0.5 is used. 
+#### If the probability of a record is greater than or equal to 0.5, it will be marked as “1”, otherwise it will be marked as “0”. These predictions need to be saved as factor variable.
+```{r}
+# Predict the class 
+LR_class <- ifelse(LR_prob >= 0.50, "1", "0")
+
+# Save the predictions as factor variables
+LR_class <- as.factor(LR_class)
+
+# Find the percentage of correct predictions
+accuracy_LR <- length(which(LR_class == test$class))/nrow(test)
+accuracy_LR
+```
+
+### model comparison
+```{r}
+# Compare correct predictions obtained by these three models
+# Return the total number of correct predictions for decision tree
+accuracy_tree
+
+# Return the total number of correct predictions for SVM
+accuracy_svm_1
+accuracy_svm_2
+
+# Return the total number of correct predictions for logistic regression
+accuracy_LR
+```
