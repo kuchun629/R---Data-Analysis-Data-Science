@@ -1,0 +1,277 @@
+---
+title: "6. Model Evaluation 2"
+date: '2022-06-25'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    toc: yes
+    toc_depth: 3
+---
+
+```{r}
+# Load caTools package for data partitioning
+library(caTools)
+
+# load Caret package for computing Confusion matrix
+library(caret) 
+
+# Packages for SVM, Random Forest and GBM
+library(e1071)
+library(randomForest)
+library(gbm)
+
+library(readr)
+
+# Import churndata.csv
+churndata <- read_csv("/Users/kuchunyeh/Documents/WBS term 1/AIP Seminars(Analytics in Practice)/churndata.csv")
+
+# Display the structure of the dataset
+str(churndata)
+```
+
+#### remove the customer “ID” column, since it does not have any effect on the target variable.
+```{r}
+# Remove customer Id column
+churndata$ID <- NULL
+
+# Update the data type of target variable if necessary
+churndata$CLASS <- as.factor(churndata$CLASS)
+```
+
+#### need to make sure that “1” is identified as the positive class since our focus is on churn customers.
+```{r}
+# Check the levels of target variable
+levels(churndata$CLASS)
+```
+
+#### Partition the dataset into training (60%) and test (40%) sets. Do not forget to set the seed for random variables. Load caTools package for data partitioning.
+```{r}
+# Set seed to 1
+set.seed(1)
+
+# Generate training and test sets
+split = sample.split(churndata$CLASS, SplitRatio = 0.6) 
+
+trainingdata = subset(churndata, split == TRUE) 
+testdata = subset(churndata, split == FALSE) 
+```
+
+### SVM
+#### build an SVM model by using all features. Note that by setting probability = TRUE in svm() function, the class probabilities and the predicted classes of the target variable can be obtained.
+```{r}
+# Build SVM model and assign it to model_SVM
+SVM_model <- svm(CLASS ~. , data=trainingdata, kernel= "radial", scale = TRUE, probability = TRUE)
+```
+
+#### Predict the class of the test data.
+```{r}
+# predict(SVM model, test data, probability = TRUE)
+```
+
+```{r}
+SVM_pred  <- predict(SVM_model, testdata, probability = TRUE)
+```
+
+```{r}
+# Use confusionMatrix to print the performance of SVM model
+confusionMatrix(SVM_pred, testdata$CLASS, positive = "1", mode = "prec_recall")
+```
+
+### Random Forest
+#### Follow the same steps as in the SVM model and build a Random Forest model. Set ntree= 800.
+```{r}
+# Set random seed
+set.seed(10)
+
+# Build Random Forest model and assign it to RF_model
+RF_model <- randomForest(CLASS ~. , trainingdata, ntree = 800)
+```
+
+#### Predict the class of the test data and store the result as RF_pred and check the confusion matrix.
+#### Use confusionMatrix() function to print model performance results.
+```{r}
+# Predict the class of the test data
+RF_pred <- predict(RF_model, testdata)
+
+# Confusion matrix
+confusionMatrix(RF_pred, testdata$CLASS, positive='1', mode = "prec_recall")
+```
+
+### Gradient Boosting Machin
+#### Gradient Boosting Machine (GBM) model
+#### GBM is one of the most powerful techniques for building predictive models. It is an ensemble learning technique used for both classification and regression problems. The main idea of this method is to improve the decision trees sequentially and increase the model accuracy with a combined model.
+```{r}
+# gbm(formula, data, distribution = "bernoulli", cv.folds = ...)
+```
+#### Formula: shows which features are used in modelling to predict the target variable.
+#### Data: the dataset that will be used for model building.
+#### For classification problems with two classes, we set distribution = "bernoulli". If the target variable has more than two classes, we set distribution = "multinomial".
+#### cv.folds: number of folds for cross-validation.
+
+#### Since we have a binary classification problem, we set distribution = "bernoulli" for this case. Note that when distribution = "bernoulli", GBM requires target variable as a numeric data type. Therefore, we first change the data type of the target variable to numeric.
+```{r}
+# Change the data type of the target variable
+trainingdata$CLASS <- as.numeric(trainingdata$CLASS)-1
+```
+#### The performance of GBM can be significantly improved with hyperparameter tuning. 
+#### n.trees: The total number of trees in the ensemble. The default value is 100. In this task, we will set n.trees = 500.
+#### interaction.depth: The depth of the individual trees. Typical values range from 3 to 8. The default value is 1. In this task, we will set interaction.depth = 3.
+#### Set the number of folds in K-fold cross validation to 5.
+
+```{r}
+# Set random seed
+set.seed(10)
+
+# Build the GBM model
+GBM_model <- gbm(CLASS ~. , trainingdata, distribution = "bernoulli", n.trees=500, interaction.depth=3, cv.folds=5)
+```
+
+
+#### GBM model stops building decision trees when the number of trees reach to the limit defined by n.trees, which is 500 for this case. However, using all trees to make a prediction on the test data may deteriorate the performance of the model due to `overfitting`. We can use gbm.perf function to find the best number of trees to use for prediction.
+```{r}
+# Find the number of trees for the prediction
+ntree_opt <- gbm.perf(GBM_model, method = "cv")
+```
+
+#### make predictions on the test data
+#### GBM returns the probability that a target variable belongs to a particular class. Therefore, we use type="response" argument to obtain these values.
+#### GBM_prob will keep the class scores (or probabilities). In order to predict the class of a test data, we use default threshold value. If the probability of a record is greater than or equal to 0.5, it will be marked as churn “1”, otherwise it will be marked as stay “0”. We need to save these predictions as factor variable.
+```{r}
+# Obtain prediction probabilities using ntree_opt
+GBM_prob <-  predict(GBM_model, testdata, n.trees = 150, type = "response")
+
+# Make predictions with threshold value 0.5
+GBM_pred <- ifelse(GBM_prob >= 0.5, "1", "0")
+
+# Save the predictions as a factor variable
+GBM_pred <- as.factor(GBM_pred)
+
+# Confusion matrix
+confusionMatrix(GBM_pred, testdata$CLASS, positive='1', mode = "prec_recall")
+```
+
+### Model Evaluation Visualisation
+#### visualise the performances of SVM, Random Forest and GBM by using ROC and Gain charts.
+#### To plot these charts, pROC package should be loaded.
+### roc()
+#### roc() takes two arguments; predicted class probabilities (likelihood of belonging to a class) and actual values of the test data.
+```{r}
+# roc(testset$target, probabilities)
+```
+
+#### load the pROC package.
+```{r}
+#load the ROCR package
+#install.packages("pROC")
+library(pROC) 
+```
+
+#### Obtain class probabilities (likelihood of belonging to a class) for SVM and Random Forest models built in task 1.
+#### Class probabilities of GBM are stored in GBM_prob. Therefore, we only need to extract probabilities predicted by SVM and Random Forest.
+```{r, include=FALSE}
+# Obtain class probabilities by using predict() and adding type = "prob" for Random Forest
+RF_prob <- predict(RF_model, testdata, type = "prob")
+
+# Add probability = TRUE for SVM
+SVMpred <- predict(SVM_model, testdata, probability = TRUE)
+
+# Use SVMpred to extract probabilities
+SVM_prob <- attr(SVMpred, "probabilities")
+
+# Class probabilities of GBM are stored in GBM_prob
+GBM_prob
+```
+
+#### Use roc() function to generate input data for the ROC curve of these models.
+```{r}
+# Provide probabilities and generate input data
+# SVM
+ROC_SVM <- roc(testdata$CLASS, RF_prob[,2])
+
+# Random Forest
+ROC_RF <- roc(testdata$CLASS, SVM_prob[,2])
+
+# GBM
+ROC_GBM <- roc(testdata$CLASS, GBM_prob)
+```
+
+#### Extract True Positive Rate (Sensitivities) and False Positive Rate (1-Specificities) for plotting.
+#### The true positive rate (TPR, also called sensitivity) = TP/TP+FN
+#### The false positive rate (FPR) = FP/FP+TN
+```{r}
+# Extract required data from ROC_SVM
+df_SVM = data.frame((1-ROC_SVM$specificities), ROC_SVM$sensitivities)
+
+# Extract required data from ROC_RF
+df_RF = data.frame((1-ROC_RF$specificities), ROC_RF$sensitivities)
+
+# Extract required data from ROC_GBM
+df_GBM = data.frame((1-ROC_GBM$specificities), ROC_GBM$sensitivities)
+```
+
+#### Plot the ROC curve for SVM, RF and GBM.
+```{r, fig.align='center'}
+#plot the ROC curve for Random Forest, SVM and GBM
+
+plot(df_SVM, col="red", type="l",     
+xlab="False Positive Rate (1-Specificity)", ylab="True Positive Rate (Sensitivity)")
+lines(df_RF, col="blue")                #adds ROC curve for RF
+lines(df_GBM, col="green")              #adds ROC curve for GBM
+grid(NULL, lwd = 1)
+
+abline(a = 0, b = 1, col = "lightgray") #adds a diagonal line
+
+legend("bottomright",
+c("SVM", "Random Forest", "GBM"),
+fill=c("red","blue", "green"))
+```
+
+### auc()
+#### Compute AUC values for these models by using auc() function. “roc” object obtained from roc() function can be used here to compute AUC value.
+```{r}
+#Calculate the area under the curve (AUC) for SVM 
+auc(ROC_SVM)
+
+#Calculate the area under the curve (AUC) for Random Forest 
+auc(ROC_RF)
+
+#Calculate the area under the curve (AUC) for GBM 
+auc(ROC_GBM)
+```
+
+#### Next, Cumulative Response (Gain) chart will be plotted for these models. Need to install and load CustomerScoringMetrics package.
+```{r}
+#load the CustomerScoringMetrics package
+#install.packages("CustomerScoringMetrics")
+library(CustomerScoringMetrics)
+```
+
+#### Specifically, use cumGainsTable() function to calculate cumulative gain values for our chart. This function takes three arguments. The first one is the prediction probabilities (scores), the second one is the actual values of the target variables and the third one is the increment of the threshold value.
+```{r}
+# cumGainsTable(probabilities, actual value of the target variable, resolution)
+```
+#### Plot the gain chart with increment of 1/100.
+
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+
+GainTable_SVM <- cumGainsTable(SVM_prob[,2], testdata$CLASS, resolution = 1/100)
+
+GainTable_RF <- cumGainsTable(RF_prob[,2], testdata$CLASS, resolution = 1/100)
+
+GainTable_GBM <- cumGainsTable(GBM_prob, testdata$CLASS, resolution = 1/100)
+```
+
+```{r, fig.align='center'}
+plot(GainTable_SVM[,4], col="red", type="l",    
+xlab="Percentage of test instances", ylab="Percentage of correct predictions")
+lines(GainTable_RF[,4], col="blue", type ="l")
+lines(GainTable_GBM[,4], col="green", type ="l")
+grid(NULL, lwd = 1)
+
+legend("bottomright",
+c("SVM", "Random Forest", "GBM"),
+fill=c("red","blue", "green"))
+```
